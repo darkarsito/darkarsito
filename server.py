@@ -21,6 +21,10 @@ def cargar_json(file_path):
 
 def git_commit_push(file_path):
     try:
+        # Configurar usuario git (hazlo una sola vez, pero no hace daño repetirlo)
+        subprocess.run(["git", "config", "user.email", "juanluluza@gmail.com"], check=True)
+        subprocess.run(["git", "config", "user.name", "darkarsito"], check=True)
+
         subprocess.run(["git", "add", file_path], check=True)
         subprocess.run(["git", "commit", "-m", f"Actualizado {file_path} automáticamente"], check=True)
         subprocess.run(["git", "push"], check=True)
@@ -229,4 +233,5 @@ def eliminar_todo():
     return render_template_string(index_html, licencias=licencias, licencias_en_uso=licencias_en_uso, nueva_licencia=None)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    puerto = int(os.environ.get("PORT", 5000))  # toma la variable PORT o 5000 si no existe
+    app.run(host="0.0.0.0", port=puerto, debug=True)
