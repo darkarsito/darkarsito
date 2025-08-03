@@ -21,19 +21,15 @@ def guardar_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-# Convertir string ISO a datetime
 def str_a_datetime(fecha_str):
     return datetime.fromisoformat(fecha_str)
 
-# Convertir datetime a string ISO
 def datetime_a_str(dt):
     return dt.isoformat()
 
-# Cargar licencias
 licencias_raw = cargar_json(LICENCIAS_FILE)
 licencias = {lic: str_a_datetime(fecha) for lic, fecha in licencias_raw.items()}
 
-# Cargar licencias en uso
 uso_raw = cargar_json(USO_FILE)
 licencias_en_uso = {}
 for lic, datos in uso_raw.items():
@@ -43,7 +39,6 @@ for lic, datos in uso_raw.items():
         "fecha_uso": str_a_datetime(datos["fecha_uso"])
     }
 
-# Generador de licencias
 def generar_codigo_licencia(dias_validez: int) -> str:
     fecha_exp = (datetime.now() + timedelta(days=dias_validez)).strftime("%Y-%m-%d")
     b64_fecha = base64.b64encode(fecha_exp.encode()).decode()
@@ -72,6 +67,8 @@ index_html = """
         h1, h2 { color: #333; }
         p { font-size: 1.1em; }
         .success { color: green; font-weight: bold; }
+        .danger { background-color: #dc3545; }
+        .danger:hover { background-color: #a71d2a; }
     </style>
 </head>
 <body>
@@ -136,6 +133,13 @@ index_html = """
             <p>No hay licencias en uso.</p>
         {% endif %}
     </div>
+
+    <div class="section">
+        <h2>Eliminar Todas las Licencias</h2>
+        <form id="eliminarForm" method="POST" action="/eliminar_todo?token=midesecreto123" onsubmit="return confirm('¿Estás seguro de eliminar todas las licencias?');">
+            <button class="btn danger" type="submit">🗑️ Eliminar Todas las Licencias</button>
+        </form>
+    </div>
 </body>
 </html>
 """
@@ -153,8 +157,7 @@ def generar():
     nueva_lic = generar_codigo_licencia(dias)
     fecha_exp = datetime.now() + timedelta(days=dias)
     licencias[nueva_lic] = fecha_exp
-    # Guardar licencias actualizadas
-    licencias_serializable = {k: datetime_a_str(v) for k,v in licencias.items()}
+    licencias_serializable = {k: datetime_a_str(v) for k, v in licencias.items()}
     guardar_json(LICENCIAS_FILE, licencias_serializable)
     return render_template_string(index_html, licencias=licencias, licencias_en_uso=licencias_en_uso, nueva_licencia=nueva_lic)
 
@@ -178,20 +181,17 @@ def validar():
     if datetime.now() > fecha_exp:
         return jsonify({"estado": "error", "mensaje": "Licencia expirada."}), 400
 
-    # Verifica si licencia ya está en uso por otro equipo
     if licencia in licencias_en_uso:
         uso = licencias_en_uso[licencia]
         if uso["pc_name"] != pc_name or uso["mb_id"] != mb_id:
             return jsonify({"estado": "error", "mensaje": "Licencia ya está en uso en otro equipo."}), 400
 
-    # Registrar uso o actualizar fecha
     licencias_en_uso[licencia] = {
         "pc_name": pc_name,
         "mb_id": mb_id,
         "fecha_uso": datetime.now()
     }
 
-    # Guardar licencias en uso actualizadas
     uso_serializable = {
         lic: {
             "pc_name": datos["pc_name"],
@@ -203,6 +203,18 @@ def validar():
     guardar_json(USO_FILE, uso_serializable)
 
     return jsonify({"estado": "ok", "mensaje": "Licencia validada correctamente."})
+
+@app.route("/eliminar_todo", methods=["POST"])
+def eliminar_todo():
+    token = request.args.get("token")
+    if token != "midesecreto123":
+        return jsonify({"estado": "error", "mensaje": "Token inválido"}), 403
+
+    licencias.clear()
+    licencias_en_uso.clear()
+    guardar_json(LICENCIAS_FILE, {})
+    guardar_json(USO_FILE, {})
+    return render_template_string(index_html, licencias=licencias, licencias_en_uso=licencias_en_uso, nueva_licencia=None)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
