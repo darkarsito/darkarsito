@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 import random
 import json
 import os
-
+import threading
+import subprocess
+import json
 app = Flask(__name__)
 
 LICENCIAS_FILE = "licencias.json"
@@ -17,9 +19,19 @@ def cargar_json(file_path):
             return json.load(f)
     return {}
 
+def git_commit_push(file_path):
+    try:
+        subprocess.run(["git", "add", file_path], check=True)
+        subprocess.run(["git", "commit", "-m", f"Actualizado {file_path} automáticamente"], check=True)
+        subprocess.run(["git", "push"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️ Error al hacer commit/push automático: {e}")
+
 def guardar_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+    # Ejecutar git commit/push en hilo aparte para no bloquear
+    threading.Thread(target=git_commit_push, args=(file_path,)).start()
 
 def str_a_datetime(fecha_str):
     return datetime.fromisoformat(fecha_str)
