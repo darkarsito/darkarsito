@@ -22,7 +22,7 @@ def cargar_json(file_path):
 def git_commit_push(file_path):
     try:
         # Configurar usuario git (hazlo una sola vez, pero no hace daño repetirlo)
-        subprocess.run(["git", "config", "user.email", "juanluluza@gmail.com"], check=True)
+        subprocess.run(["git", "config", "user.email", "blizzobm@gmail.com"], check=True)
         subprocess.run(["git", "config", "user.name", "darkarsito"], check=True)
 
         subprocess.run(["git", "add", file_path], check=True)
