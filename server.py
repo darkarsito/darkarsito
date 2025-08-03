@@ -21,13 +21,18 @@ def cargar_json(file_path):
 
 def git_commit_push(file_path):
     try:
-        # Configurar usuario git (hazlo una sola vez, pero no hace daño repetirlo)
+        # Cambiar a rama main para evitar detached HEAD
+        subprocess.run(["git", "checkout", "main"], check=True)
+        
+        # Configurar usuario git
         subprocess.run(["git", "config", "user.email", "blizzobm@gmail.com"], check=True)
         subprocess.run(["git", "config", "user.name", "darkarsito"], check=True)
 
         subprocess.run(["git", "add", file_path], check=True)
         subprocess.run(["git", "commit", "-m", f"Actualizado {file_path} automáticamente"], check=True)
-        subprocess.run(["git", "push"], check=True)
+        
+        # Push explícito a origin main
+        subprocess.run(["git", "push", "origin", "main"], check=True)
     except subprocess.CalledProcessError as e:
         print(f"⚠️ Error al hacer commit/push automático: {e}")
 
