@@ -6,7 +6,7 @@ import json
 import os
 import threading
 import subprocess
-import json
+
 app = Flask(__name__)
 
 LICENCIAS_FILE = "licencias.json"
@@ -19,55 +19,75 @@ def cargar_json(file_path):
             return json.load(f)
     return {}
 
-def hacer_commit_y_push(mensaje_commit="Actualizado licencias.json automáticamente"):
+def hacer_commit_y_push(mensaje_commit="Actualizado licencias automáticamente"):
     try:
-        # Configura usuario Git si no está configurado
-        subprocess.run(["git", "config", "user.name", "darkarsito"], check=True)
-        subprocess.run(["git", "config", "user.email", "blizzobm@gmail.com"], check=True)
+        if not os.path.exists(".git"):
+            subprocess.run(["git", "init"], check=True)
 
-        # Agrega y comitea cambios
-        subprocess.run(["git", "add", "."], check=True)
-        subprocess.run(["git", "commit", "-m", mensaje_commit], check=True)
+        subprocess.run(["git", "config", "--local", "user.name", "darkarsito"], check=True)
+        subprocess.run(["git", "config", "--local", "user.email", "blizzobm@gmail.com"], check=True)
 
-        # Construye URL remota con token
+        subprocess.run(["git", "checkout", "-B", "main"], check=True)
+
+        remotes = subprocess.run(["git", "remote"], capture_output=True, text=True)
         token = os.getenv("GITHUB_TOKEN")
         if not token:
-            print("⚠️ No se encontró GITHUB_TOKEN en las variables de entorno.")
+            print("❌ No se encontró GITHUB_TOKEN en entorno.")
             return
-
         repo_url = f"https://{token}@github.com/darkarsito/darkarsito.git"
-        subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
+        if "origin" not in remotes.stdout:
+            subprocess.run(["git", "remote", "add", "origin", repo_url], check=True)
+        else:
+            subprocess.run(["git", "remote", "set-url", "origin", repo_url], check=True)
 
-        # Empuja los cambios
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-m", mensaje_commit], check=True)
         subprocess.run(["git", "push", "origin", "main"], check=True)
-        print("✅ Cambios empujados correctamente.")
-    
+
+        print("✅ Guardado y subido correctamente.")
+
     except subprocess.CalledProcessError as e:
-        print(f"⚠️ Error al hacer commit/push automático: {e}")
+        print(f"⚠️ Error durante el commit/push: {e}")
 
 def guardar_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    # Ejecutar git commit/push en hilo aparte para no bloquear
-    threading.Thread(target=hacer_commit_y_push, args=(file_path,)).start()
+    # Pasar mensaje con archivo modificado
+    threading.Thread(target=hacer_commit_y_push, args=(f"Actualizado {file_path} automáticamente",)).start()
 
 def str_a_datetime(fecha_str):
-    return datetime.fromisoformat(fecha_str)
+    # Maneja que fecha_str pueda venir None o no ser ISO correcto
+    if not fecha_str:
+        return None
+    try:
+        return datetime.fromisoformat(fecha_str)
+    except Exception:
+        return None
 
 def datetime_a_str(dt):
+    if not dt:
+        return ""
     return dt.isoformat()
 
+# Cargar licencias y convertir fechas a datetime
 licencias_raw = cargar_json(LICENCIAS_FILE)
-licencias = {lic: str_a_datetime(fecha) for lic, fecha in licencias_raw.items()}
+licencias = {}
+for lic, fecha in licencias_raw.items():
+    dt = str_a_datetime(fecha)
+    if dt:
+        licencias[lic] = dt
 
+# Cargar licencias en uso y convertir fechas
 uso_raw = cargar_json(USO_FILE)
 licencias_en_uso = {}
 for lic, datos in uso_raw.items():
-    licencias_en_uso[lic] = {
-        "pc_name": datos["pc_name"],
-        "mb_id": datos["mb_id"],
-        "fecha_uso": str_a_datetime(datos["fecha_uso"])
-    }
+    fecha_uso = str_a_datetime(datos.get("fecha_uso"))
+    if fecha_uso:
+        licencias_en_uso[lic] = {
+            "pc_name": datos.get("pc_name", ""),
+            "mb_id": datos.get("mb_id", ""),
+            "fecha_uso": fecha_uso
+        }
 
 def generar_codigo_licencia(dias_validez: int) -> str:
     fecha_exp = (datetime.now() + timedelta(days=dias_validez)).strftime("%Y-%m-%d")
@@ -247,5 +267,5 @@ def eliminar_todo():
     return render_template_string(index_html, licencias=licencias, licencias_en_uso=licencias_en_uso, nueva_licencia=None)
 
 if __name__ == "__main__":
-    puerto = int(os.environ.get("PORT", 5000))  # toma la variable PORT o 5000 si no existe
+    puerto = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=puerto, debug=True)
