@@ -252,7 +252,12 @@ def validar():
     }
     guardar_json(USO_FILE, uso_serializable)
 
-    return jsonify({"estado": "ok", "mensaje": "Licencia validada correctamente."})
+    # <-- Agrega esta línea para enviar la fecha de expiración en la respuesta:
+    return jsonify({
+        "estado": "ok",
+        "mensaje": "Licencia validada correctamente.",
+        "fecha_expiracion": fecha_exp.isoformat()
+    })
 
 @app.route("/eliminar_todo", methods=["POST"])
 def eliminar_todo():
